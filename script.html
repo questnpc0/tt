@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 다차원 유사도 워들 게임</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="data.js"></script>
+    
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; text-align: center; background: #1e1e24; color: white; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #2a2a35; padding: 30px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); position: relative; }
+        
+        /* 💡 제목 및 설명 버튼 스타일 */
+        .title-area { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .help-btn { background: #3e3e4f; border: 1px solid #57606f; color: #ced6e0; border-radius: 5px; padding: 5px 10px; font-size: 13px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .help-btn:hover { background: #57606f; color: white; }
+
+        .control-panel { margin-bottom: 20px; }
+        select { padding: 12px; font-size: 16px; border-radius: 6px; border: none; background: #3e3e4f; color: white; margin-bottom: 15px; width: 100%; cursor: pointer; }
+        
+        .mode-container { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; }
+        .toggle-btn { padding: 8px 16px; font-size: 14px; background: #57606f; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 20px; transition: 0.3s; }
+        .toggle-btn.active { background: #ff4757; color: white; }
+        .lives-display { font-weight: bold; font-size: 16px; color: #ffbc00; }
+
+        input { padding: 12px; font-size: 16px; width: 60%; border-radius: 6px; border: none; margin-right: 10px; box-sizing: border-box; }
+        button.submit-btn { padding: 12px 24px; font-size: 16px; background: #38ef7d; border: none; color: #1e1e24; font-weight: bold; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+        button.submit-btn:hover { background: #11998e; color: white; }
+        button.submit-btn:disabled { background: #57606f; color: #a4b0be; cursor: not-allowed; }
+        
+        .chart-container { width: 100%; max-width: 380px; margin: 20px auto; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px; }
+        
+        .guess-list { margin-top: 20px; text-align: left; max-height: 250px; overflow-y: auto; }
+        .guess-item { padding: 12px; margin: 8px 0; border-radius: 6px; display: flex; flex-direction: column; font-weight: bold; font-size: 15px; gap: 4px; }
+        .guess-main { display: flex; justify-content: space-between; width: 100%; }
+        .guess-details { font-size: 12px; opacity: 0.85; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 4px; margin-top: 2px; }
+        
+        .high { background: #2ed573; color: white; }
+        .medium { background: #ffa502; color: #1e1e24; }
+        .low { background: #ff4757; color: white; }
+
+        /* 💡 게임 설명 팝업(모달) 스타일 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #2a2a35; padding: 25px; border-radius: 12px; max-width: 450px; text-align: left; border: 1px solid #57606f; line-height: 1.6; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal h3 { margin-top: 0; color: #38ef7d; border-bottom: 2px solid #3e3e4f; padding-bottom: 10px; }
+        .modal ul { padding-left: 20px; margin: 15px 0; font-size: 14px; }
+        .modal li { margin-bottom: 8px; }
+        .modal-close-btn { display: block; width: 100%; padding: 10px; background: #38ef7d; color: #1e1e24; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="title-area">
+        <h2>🧩 AI 다차원 시각화 워들</h2>
+        <button class="help-btn" onclick="openModal()">❔ 게임 설명</button>
+    </div>
+    <p style="margin-top: 0; color: #a4b0be; font-size: 14px;">주제를 고르고 단어를 입력해 정답 벡터와 맞춰보세요!</p>
+    
+    <div class="control-panel">
+        <select id="categorySelect" onchange="initGame()">
+            <option value="IT/전자기기">🎯 주제: IT/전자기기 (기계성, 휴대성, 가전성)</option>
+            <option value="동물/생명체">🦁 주제: 동물/생명체 (포유류성, 친밀도, 덩치크기)</option>
+            <option value="음식/요리">🍕 주제: 음식/요리 (탄수화물, 매운맛, 디저트성)</option>
+        </select>
+        
+        <div class="mode-container">
+            <button id="toggleModeBtn" class="toggle-btn" onclick="toggleHardMode()">하드모드: OFF</button>
+            <div id="livesDisplay" class="lives-display">기회: 무제한 ♾️</div>
+        </div>
+        
+        <input type="text" id="wordInput" placeholder="단어를 입력하고 Enter 또는 버튼 클릭!">
+        <button id="submitBtn" class="submit-btn" onclick="checkSimilarity()">추측</button>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="similarityChart"></canvas>
+    </div>
+
+    <div style="margin-top: 25px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.2);">
+        <h4 style="margin: 0 0 10px 0; color: #a4b0be; font-size: 14px;">📝 입력 가능한 단어 사전</h4>
+        <div id="wordDictionary" style="font-size: 13px; color: #ced6e0; line-height: 1.6; word-break: keep-all; max-height: 80px; overflow-y: auto; text-align: center; padding: 0 10px;"></div>
+    </div>
+
+    <div class="guess-list" id="guessList"></div>
+</div>
+
+<div id="helpModal" class="modal">
+    <div class="modal-content">
+        <h3>📐 AI 워들 게임 설명 & 수학 원리</h3>
+        <p style="font-size: 14px; margin-bottom: 5px;">이 게임은 인공지능의 <strong>자연어 처리(NLP)</strong> 원리를 기반으로 제작된 수학 교육용 게임입니다.</p>
+        <ul>
+            <li><strong>단어 임베딩 (벡터):</strong> 모든 단어는 성격을 나타내는 3차원 벡터 좌표로 정의되어 있습니다.</li>
+            <li><strong>코사인 유사도:</strong> 유저가 입력한 단어 벡터와 정답 단어 벡터 사이의 사이각을 구해 <strong>전체 유사도(0~100%)</strong>를 계산합니다. 철자가 아닌 의미적 거리를 추론해야 합니다.</li>
+            <li><strong>오차 피드백 (MAE):</strong> 세부 항목 일치도는 두 벡터의 차이(절댓값 오차)를 기반으로 작동합니다. 차트를 보며 오차를 최소화하는 단어를 찾아보세요!</li>
+            <li><strong>하드모드:</strong> 원조 워들처럼 단 6번의 기회 안에 정답 벡터를 맞춰야 하는 서바이벌 모드입니다.</li>
+        </ul>
+        <button class="modal-close-btn" onclick="closeModal()">게임 시작하기</button>
+    </div>
+</div>
+
+<script>
+    let currentCategory = "IT/전자기기";
+    let wordEmbedding = {};
+    let targetVector = [];
+    let TARGET_WORD = "";
+    let similarityChart;
+
+    let isHardMode = false;
+    let maxLives = 6;
+    let currentLives = 6;
+    let isGameOver = false;
+
+    // 💡 팝업창 제어 함수
+    function openModal() { document.getElementById("helpModal").style.display = "flex"; }
+    function closeModal() { document.getElementById("helpModal").style.display = "none"; }
+
+    function createChart() {
+        const ctx = document.getElementById('similarityChart').getContext('2d');
+        similarityChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: GAME_DATA[currentCategory].attributes,
+                datasets: [
+                    {
+                        label: '🎯 정답 단어 (???)',
+                        data: [0, 0, 0],
+                        backgroundColor: 'rgba(56, 239, 125, 0.15)',
+                        borderColor: '#38ef7d',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#38ef7d'
+                    },
+                    {
+                        label: '👤 내가 입력한 단어',
+                        data: [0, 0, 0],
+                        backgroundColor: 'rgba(255, 71, 87, 0.3)',
+                        borderColor: '#ff4757',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#ff4757'
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        pointLabels: { color: 'white', font: { size: 12, fontWeight: 'bold' } },
+                        ticks: { display: false },
+                        min: 0,
+                        max: 1
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: 'white' } }
+                }
+            }
+        });
+    }
+
+    function toggleHardMode() {
+        isHardMode = !isHardMode;
+        const btn = document.getElementById("toggleModeBtn");
+        if (isHardMode) {
+            btn.innerText = "하드모드: ON 🔥";
+            btn.classList.add("active");
+        } else {
+            btn.innerText = "하드모드: OFF";
+            btn.classList.remove("active");
+        }
+        initGame();
+    }
+
+    function updateLivesUI() {
+        const livesEl = document.getElementById("livesDisplay");
+        if (isHardMode) {
+            livesEl.innerHTML = `남은 기회: ${"❤️ ".repeat(currentLives)}${"🖤 ".repeat(maxLives - currentLives)}`;
+        } else {
+            livesEl.innerHTML = `기회: 무제한 ♾️`;
+        }
+    }
+
+    function initGame() {
+        const selectEl = document.getElementById("categorySelect");
+        currentCategory = selectEl.value;
+        
+        const categoryData = GAME_DATA[currentCategory];
+        wordEmbedding = categoryData.words;
+        
+        const keys = Object.keys(wordEmbedding);
+        TARGET_WORD = keys[Math.floor(Math.random() * keys.length)];
+        targetVector = wordEmbedding[TARGET_WORD];
+        
+        const dictEl = document.getElementById("wordDictionary");
+        dictEl.innerText = keys.sort().join(", ");
+
+        similarityChart.data.labels = categoryData.attributes;
+        similarityChart.data.datasets[0].data = targetVector;
+        similarityChart.data.datasets[0].label = '🎯 정답 단어 (???)';
+        similarityChart.data.datasets[1].data = [0, 0, 0];
+        similarityChart.data.datasets[1].label = '👤 내가 입력한 단어';
+        
+        isGameOver = false;
+        currentLives = maxLives;
+        document.getElementById("submitBtn").disabled = false;
+        document.getElementById("wordInput").disabled = false;
+        updateLivesUI();
+
+        document.getElementById("guessList").innerHTML = "";
+        document.getElementById("wordInput").value = "";
+        
+        similarityChart.update();
+    }
+
+    function cosineSimilarity(vecA, vecB) {
+        let dotProduct = 0, normA = 0, normB = 0;
+        for (let i = 0; i < vecA.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
+        }
+        if (normA === 0 || normB === 0) return 0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    function calculateDimensionSimilarity(vecA, vecB) {
+        let dims = [];
+        for (let i = 0; i < vecA.length; i++) {
+            let diff = Math.abs(vecA[i] - vecB[i]);
+            let simPercent = Math.max(0, 100 - Math.round(diff * 100));
+            dims.push(simPercent);
+        }
+        return dims;
+    }
+
+    function checkSimilarity() {
+        if (isGameOver) return;
+
+        const inputEl = document.getElementById("wordInput");
+        const guess = inputEl.value.trim();
+        
+        if (!wordEmbedding[guess]) {
+            alert(`[${currentCategory}] 사전에 없는 단어입니다! 아래 리스트에서 골라보세요.`);
+            return;
+        }
+
+        const guessVector = wordEmbedding[guess];
+        const categoryData = GAME_DATA[currentCategory];
+        
+        const similarity = cosineSimilarity(targetVector, guessVector);
+        const scorePercent = Math.round(similarity * 100);
+        const dimensionSims = calculateDimensionSimilarity(targetVector, guessVector);
+
+        similarityChart.data.datasets[1].data = guessVector;
+        similarityChart.data.datasets[1].label = `👤 내가 입력한 단어 (${guess})`;
+        
+        if (isHardMode && guess !== TARGET_WORD) {
+            currentLives--;
+            updateLivesUI();
+        }
+
+        let textAppend = "";
+        if (guess === TARGET_WORD) {
+            similarityChart.data.datasets[0].label = `🎯 정답 단어 (${TARGET_WORD})`;
+            textAppend = " 🎉 정답입니다!";
+            isGameOver = true;
+            document.getElementById("submitBtn").disabled = true;
+            document.getElementById("wordInput").disabled = true;
+        } else if (isHardMode && currentLives <= 0) {
+            similarityChart.data.datasets[0].label = `🎯 정답 단어 (${TARGET_WORD})`;
+            textAppend = ` 💀 실패.. 정답은 [${TARGET_WORD}]였습니다!`;
+            isGameOver = true;
+            document.getElementById("submitBtn").disabled = true;
+            document.getElementById("wordInput").disabled = true;
+            alert(`게임 오버! 아쉽게 탈락하셨습니다. 정답은 [${TARGET_WORD}]입니다.`);
+        }
+
+        similarityChart.update();
+
+        let colorClass = "low";
+        if (scorePercent > 85) colorClass = "high";
+        else if (scorePercent > 55) colorClass = "medium";
+
+        let detailText = "";
+        for(let i=0; i<categoryData.attributes.length; i++) {
+            detailText += `${categoryData.attributes[i]}: ${dimensionSims[i]}%`;
+            if(i < categoryData.attributes.length - 1) detailText += " | ";
+        }
+
+        const guessList = document.getElementById("guessList");
+        const item = document.createElement("div");
+        item.className = `guess-item ${colorClass}`;
+        item.innerHTML = `
+            <div class="guess-main">
+                <span>${guess}</span> 
+                <span>전체 유사도: ${scorePercent}%${textAppend}</span>
+            </div>
+            <div class="guess-details">📊 세부 항목 일치도 ➡️ ${detailText}</div>
+        `;
+        guessList.insertBefore(item, guessList.firstChild);
+        
+        inputEl.value = "";
+    }
+
+    document.getElementById("wordInput").addEventListener("keyup", function(event) {
+        if (event.key === "Enter" && !isGameOver) {
+            checkSimilarity();
+        }
+    });
+
+    window.onload = function() {
+        createChart();
+        initGame();
+    };
+</script>
+</body>
+</html>
